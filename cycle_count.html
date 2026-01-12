@@ -991,17 +991,20 @@
           const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
           
           const requiredHeaders = ['Item Code', 'Location', 'System Qty', 'Physical Qty'];
-          if (!requiredHeaders.every(h => headers.includes(h))) {
-            alert(`Import failed: CSV must contain headers: ${requiredHeaders.join(', ')}.`);
+          const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+          
+          if (missingHeaders.length > 0) {
+            alert(`Import failed. Missing headers: ${missingHeaders.join(', ')}.\nRequired headers are: ${requiredHeaders.join(', ')}`);
             return;
           }
 
           const data = JSON.parse(localStorage.getItem(STORAGE_KEY_CC) || '[]');
           let addedCount = 0;
           let duplicateCount = 0;
+          let errorMessages = [];
 
           for (let i = 1; i < lines.length; i++) {
-            if (!lines[i]) continue;
+            if (!lines[i].trim()) continue;
             const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
             
             let createdDateVal = new Date().toISOString();
@@ -1041,30 +1044,49 @@
                if(masterMap[newItem.itemCode]) newItem.description = masterMap[newItem.itemCode];
             }
 
-            // Validate Item Code (exactly 8 digits)
-            if (newItem.itemCode && /^\d{8}$/.test(newItem.itemCode) && !isNaN(newItem.system) && !isNaN(newItem.physical)) {
-              // Check for duplicates (Item Code + Location + Created Date)
-              const exists = data.some(d => d.itemCode === newItem.itemCode && d.location === newItem.location && d.createdDate === newItem.createdDate);
-              if (exists) {
-                duplicateCount++;
-              } else {
-                data.unshift(newItem);
-                addedCount++;
-              }
+            // Validation
+            let rowErrors = [];
+            if (!newItem.itemCode) rowErrors.push("Missing Item Code");
+            else if (!/^\d{8}$/.test(newItem.itemCode)) rowErrors.push(`Invalid Item Code '${newItem.itemCode}' (must be 8 digits)`);
+            
+            if (isNaN(newItem.system)) rowErrors.push(`Invalid System Qty '${values[headers.indexOf('System Qty')] || ''}'`);
+            if (isNaN(newItem.physical)) rowErrors.push(`Invalid Physical Qty '${values[headers.indexOf('Physical Qty')] || ''}'`);
+
+            if (rowErrors.length > 0) {
+                errorMessages.push(`Row ${i+1}: ${rowErrors.join(', ')}`);
+                continue;
+            }
+
+            // Check for duplicates (Item Code + Location + Created Date)
+            const exists = data.some(d => d.itemCode === newItem.itemCode && d.location === newItem.location && d.createdDate === newItem.createdDate);
+            if (exists) {
+              duplicateCount++;
+            } else {
+              data.unshift(newItem);
+              addedCount++;
             }
           }
           if (addedCount > 0 || duplicateCount > 0) {
             localStorage.setItem(STORAGE_KEY_CC, JSON.stringify(data));
             let msg = `${addedCount} entries imported successfully.`;
             if (duplicateCount > 0) msg += ` ${duplicateCount} duplicates skipped.`;
+            if (errorMessages.length > 0) {
+                msg += `\n\n${errorMessages.length} errors found:\n` + errorMessages.slice(0, 5).join('\n');
+                if(errorMessages.length > 5) msg += `\n...and ${errorMessages.length - 5} more.`;
+            }
             alert(msg);
             loadData();
           } else {
-            alert('No valid entries found to import.');
+            let msg = 'No valid entries found to import.';
+            if (errorMessages.length > 0) {
+                msg += `\n\nErrors:\n` + errorMessages.slice(0, 10).join('\n');
+                if(errorMessages.length > 10) msg += `\n...and ${errorMessages.length - 10} more.`;
+            }
+            alert(msg);
           }
         } catch (error) {
           console.error('Import error:', error);
-          alert('Failed to import CSV file. Please check the file format.');
+          alert('Failed to import CSV file. Error: ' + error.message);
         } finally {
           ccImportFile.value = '';
         }
