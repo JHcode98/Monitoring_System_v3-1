@@ -372,6 +372,10 @@
             <div class="stat-value" id="stat-abs-variance">-</div>
             <div class="stat-label">Abs. Variance</div>
           </div>
+          <div class="stat-card">
+            <div class="stat-value" id="stat-storage">-</div>
+            <div class="stat-label">Storage Used</div>
+          </div>
         </div>
 
         <div class="dashboard-charts-row" style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
@@ -1288,6 +1292,20 @@
       document.getElementById('stat-net-variance').textContent = (netVariance > 0 ? '+' : '') + netVariance;
       document.getElementById('stat-net-variance').style.color = netVariance === 0 ? '#2752a7' : (netVariance > 0 ? '#f1c40f' : '#e74c3c');
       document.getElementById('stat-abs-variance').textContent = absVariance;
+
+      // Storage Usage
+      let totalUsage = 0;
+      for (let key in localStorage) {
+        if (localStorage.hasOwnProperty(key)) {
+          totalUsage += (localStorage[key].length + key.length);
+        }
+      }
+      const totalBytes = totalUsage * 2; // Approx 2 bytes per char
+      const limitBytes = 5 * 1024 * 1024; // 5MB limit
+      const usagePct = (totalBytes / limitBytes) * 100;
+      const storageEl = document.getElementById('stat-storage');
+      if(storageEl) storageEl.textContent = `${(totalBytes/1024).toFixed(0)} KB (${usagePct.toFixed(1)}%)`;
+      if(storageEl && usagePct > 90) storageEl.style.color = '#e74c3c';
 
       // 2. Charts
       // Helper to destroy old charts
