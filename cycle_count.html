@@ -1086,7 +1086,11 @@
           }
         } catch (error) {
           console.error('Import error:', error);
-          alert('Failed to import CSV file. Error: ' + error.message);
+          if (error.name === 'QuotaExceededError' || error.message.includes('exceeded the quota')) {
+            alert('Import failed: Storage full. You have reached the browser storage limit (approx 5MB). Please delete old records to make space.');
+          } else {
+            alert('Failed to import CSV file. Error: ' + error.message);
+          }
         } finally {
           ccImportFile.value = '';
         }
